@@ -1,0 +1,4 @@
+# gitignore for matlab
+
+# data folder
+data/**/*
