@@ -34,7 +34,7 @@ function vr = initializationCodeFun(vr)
     % =====================
 
     % REMEMBER TO CHECK THESE PARAMETERS FOR EACH EXPERIMENT
-    vr.rewarded_task = 'non-match';  % Whether 'match' or 'non-match' trials are rewarded
+    vr.rewarded_task = 'match';  % Whether 'match' or 'non-match' trials are rewarded
     vr.additional_str = '';  % Additional notes to be added to the file name (optional)
     
     % PRESET OPTIONS: 
@@ -79,7 +79,7 @@ function vr = initializationCodeFun(vr)
     % - vr.ITI : time the intertrial interval is for
     % - vr.stim1_to_stim2_delay_mean : mean of the Gaussian distribution from which the delay will be drawn
     % - vr.stim1_to_stim2_delay_std : standard deviation of the Gaussian distribution from which the delay will be drawn
-    % - vr.probe_trials : probability of probe trials (0 to 1; 0.5 means 50% of trials are probe trials)
+    % - vr.p_probe_trials : probability of probe trials (0 to 1; 0.5 means 50% of trials are probe trials)
     % - vr.integrate_licks : true if lick signal is integrated, false if only onsets are counted
 
 
@@ -89,11 +89,23 @@ function vr = initializationCodeFun(vr)
 
     vr.outputPath = 'C:\Users\VR Rig #2\Documents\MATLAB\Rishika_data\';    % Path to the folder where the data will be saved (data and experiment files will be saved in separate files)
     
+    % add a date subfolder to the output path
+    vr.outputPath = strcat(vr.outputPath,datestr(now,'mmddyyyy'),'\');
+    if ~exist(vr.outputPath,'dir')
+        mkdir(vr.outputPath);
+    end
+
+    % add a subfolder for the cagenum_animalname to the output path
+    vr.outputPath = strcat(vr.outputPath,vr.cagenum,'_',vr.name,'\');
+    if ~exist(vr.outputPath,'dir')
+        mkdir(vr.outputPath);
+    end
 
     % EXPERIMENT PARAMETERS
     vr.experimentName = '';                                                 % Name of the experiment
     vr.lick_requirement = false;                                            % Require licking to get reward
     vr.puff_punishment = false;                                             % Deliver air puff as punishment instead of just not giving water
+    vr.timeout_punishment = false;                                          % Deliver timeout as punishment instead of just not giving water
     
     % TRIAL PARAMETERS
     vr.blocked_vs_interleaved = 'blocked';                                  % Define if the experiment will be blocked or interleaved
@@ -101,7 +113,8 @@ function vr = initializationCodeFun(vr)
     vr.blockSize = 5;                                                       % for blocked trials, this is the number of trials per block
     vr.matched_bias = 0.5;                                                  % Define the probability of matched trials
     vr.stim_bias = 0.5;                                                     % Define the probability of stim 2 first trials
-    vr.probe_trials = 0;                                                    % probability of probe trials (0 to 1; 0.5 means 50% of trials are probe trials)
+    vr.p_probe_trials = 0;                                                    % probability of probe trials (0 to 1; 0.5 means 50% of trials are probe trials)
+    vr.end_early_if_not_rewarded = false;                                   % end the trial early if the animal is not receiving reward
 
     % RIG PARAMETERS
     vr.lickportBias = 0;                                                    % lickport bias (0.5 for either side, 0 for left, 1 for right)
@@ -112,11 +125,12 @@ function vr = initializationCodeFun(vr)
     vr.startTone_to_stim1_delay = 1.3;                                      % Define the time between the start tone and the first stim
     vr.stim_wait = 3.4;                                                     % How long the odor is presented for (also defined in arduino code)
     vr.decision_period_delay = 0.9;                                         % How long into the odor presentation the decision period starts
-    vr.decision_period = 1;                                                 % How long the decision period is for
+    vr.decision_period = 2.5;                                               % How long the decision period is for
     vr.reward_period = 4;                                                   % How long the reward period is for
-    vr.ITI = 15;                                                            % How long the intertrial period is for
-    vr.stim1_to_stim2_delay_mean = 1;                                       % Define the mean of the Gaussian distribution from which the delay will be drawn
+    vr.ITI = 10;                                                            % How long the intertrial period is for
+    vr.stim1_to_stim2_delay_mean = 5;                                       % Define the mean of the Gaussian distribution from which the delay will be drawn
     vr.stim1_to_stim2_delay_std = 0.0;                                      % Define the standard deviation of the Gaussian distribution from which the delay will be drawn
+    vr.timeout_period = 5;                                                  % Define the timeout period (if timeout_punishment is true)
 
     % ---------------------
     % PRESET CONFIGURATIONS
@@ -124,7 +138,7 @@ function vr = initializationCodeFun(vr)
 
     % water release
     if strcmp(vr.use_preset,'water_release')
-        vr.experimentName = 'rig_test';
+        vr.experimentName = 'rig_initiation';
         vr.blocked_vs_interleaved = 'blocked';
         vr.ntrials = 10;
         vr.blockSize = 5;
@@ -225,7 +239,7 @@ function vr = initializationCodeFun(vr)
     % ***************************
 
 
-    % Define the output file name (FORMAT: name_cagenum_mmddyyyy_<experiment_name>_<lick requirement>_<puff punishment>.mat)
+    % Define the output file name (FORMAT: name_cagenum_mmddyyyy_<experiment_name>_<lick requirement>_<puff punishment>_<timeout punishment>_<additional notes>.mat)
     if vr.lick_requirement == true
         vr.str_lickreq = '_lick'; % Add this to file name if lick requirement is true
     else
@@ -236,6 +250,12 @@ function vr = initializationCodeFun(vr)
         vr.str_puff = '_puff'; % Add this to file name if puff punishment is true
     else
         vr.str_puff = ''; % Add this to file name if puff punishment is true
+    end
+
+    if vr.timeout_punishment == true
+        vr.str_timeout = '_tout'; % Add this to file name if timeout punishment is true
+    else
+        vr.str_timeout = ''; % Add this to file name if timeout punishment is true
     end
 
     % add DNMS/DMS to the experiment name
@@ -286,10 +306,12 @@ function vr = initializationCodeFun(vr)
     experiment_metadata.decision_period = vr.decision_period;
     experiment_metadata.reward_period = vr.reward_period;
     experiment_metadata.ITI = vr.ITI;
-    experiment_metadata.probe_trials = vr.probe_trials;
+    experiment_metadata.timeout_period = vr.timeout_period;
+    experiment_metadata.p_probe_trials = vr.p_probe_trials;
     experiment_metadata.integrate_licks = vr.integrate_licks;
-    experiment_metadata.str_punish = vr.str_punish;
+    experiment_metadata.str_lickreq = vr.str_lickreq;
     experiment_metadata.str_puff = vr.str_puff;
+    experiment_metadata.str_timeout = vr.str_timeout;
     experiment_metadata.additional_str = vr.additional_str;
 
     % check if metadata file already exists
@@ -335,6 +357,7 @@ function vr = initializationCodeFun(vr)
     vr.Deliver_water_right = 0;                 % used to trigger water delivery to right lickport
     vr.synchPulse = 0;                          % used to trigger a synch pulse for imaging
     vr.puffPun = 0;                             % used to trigger a puff of air as punishment
+    vr.timeoutPun = 0;                          % used to trigger a timeout as punishment (NOT IMPLEMENTED YET)
 
     % Define variables which enable execution of proper trial chronology
     vr.tone_presented = 0;               % check if tone has been presented
@@ -343,7 +366,7 @@ function vr = initializationCodeFun(vr)
     vr.second_stim_begin = 0;      % check if stim 2 has begun
     vr.ITI_started = 0;           % check if ITI has happened
     vr.decision_started = 0;       % check if decision period has begun
-    vr.reward_started = 0;         % check if reward period has begun
+    vr.reinforcement_started = 0;         % check if reward period has begun
     vr.stim1_first = 0;             % 1 if stim 1 was presented first in the trial
     vr.stim2_first = 0;             % 1 if stim 2 was presented first in the trial
     vr.stim1_second = 0;            % 1 if stim 1 was presented second in the trial
@@ -368,7 +391,8 @@ function vr = initializationCodeFun(vr)
 
     % Define variables to track whether reinforcement was delivered
     vr.reward_delivered = 0; % 1 if reward was delivered
-    vr.punishment_delivered = 0; % 1 if punishment was delivered
+    vr.puff_delivered = 0; % 1 if puff was delivered
+    vr.timeout_delivered = 0; % 1 if timeout was delivered
 
     % Define variables to store lick data
     vr.licks_right = 0;
@@ -466,7 +490,7 @@ function vr = initializationCodeFun(vr)
     vr.stim1_to_stim2_delays(vr.stim1_to_stim2_delays < 0) = 0; % clip the delays to be positive
 
     % Probe trials for used for  shaping without decision period such that the animal is 
-    vr.probetrials = [ones(round(vr.probe_trials*vr.ntrials),1); zeros(vr.ntrials-round(vr.probe_trials*vr.ntrials),1)];
+    vr.probetrials = [ones(round(vr.p_probe_trials*vr.ntrials),1); zeros(vr.ntrials-round(vr.p_probe_trials*vr.ntrials),1)];
     vr.probetrials = vr.probetrials(randperm(length(vr.probetrials)));
 
     % LOG OUTPUT
@@ -499,6 +523,7 @@ function vr = runtimeCodeFun(vr)
     vr.Stim1_valve = 0;
     vr.Stim2_valve = 0;
     vr.tone = 0;
+    vr.timeoutPun = 0; % NOT IMPLEMENTED YET
     vr.AirON = 0;
     vr.lick_signal = [0 0];
     vr.Extend_actuator = 0;
@@ -525,7 +550,7 @@ function vr = runtimeCodeFun(vr)
         end
         % Setup the start tone and initiate the trial
         vr.tone = 1; % initiate the start tone
-        disp(strcat('Start tone sent at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+        disp(strcat('Start tone sent at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         vr.newtrial = 0;  % new trial started, set to 0
         vr.tone_presented = 1;  % variable to verify if tone has been presented
         vr.timepoint_to_track = vr.timeElapsed; % track the time of the start tone
@@ -550,12 +575,12 @@ function vr = runtimeCodeFun(vr)
                 % Stim 1 is presented first
                 vr.Stim1_valve = 1; % initiate stim 1 presentation
                 vr.stim1_first = 1; % tag that stim 1 was presented first
-                disp(strcat('First Stimulus: Stim1 started at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+                disp(strcat('First Stimulus: Stim1 started at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
             case {2,4}
                 % Stim 2 is presented first
                 vr.Stim2_valve = 1; % initiate stim 2 presentation
                 vr.stim2_first = 1; % tag that stim 2 was presented first
-                disp(strcat('First Stimulus: Stim2 started at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+                disp(strcat('First Stimulus: Stim2 started at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         end
         vr.tone_presented = 0; % tone has been presented, set to 0
         vr.first_stim_started = 1; % variable to verify if stim 1 has been presented
@@ -570,7 +595,7 @@ function vr = runtimeCodeFun(vr)
 
     % Wait for stim 1 to be presented and then start the delay period
     if (round(vr.stopwatch,1) == vr.stim_wait) && (vr.first_stim_started == 1)
-        disp(strcat('Delay started for ',num2str(round(vr.stim1_to_stim2_delays(vr.current_trial),1)), ' s'));
+        disp(strcat('Delay started for  ',[' ' num2str(round(vr.stim1_to_stim2_delays(vr.current_trial),1))], ' s'));
         vr.first_stim_started = 0; % stim 1 has been presented, set to 0
         vr.delay_started = 1; % variable to verify if delay has started
         vr.timepoint_to_track = vr.timeElapsed; % reset the timepoint to track the start of the delay
@@ -589,12 +614,12 @@ function vr = runtimeCodeFun(vr)
                 % Stim 2 is presented second
                 vr.Stim2_valve = 1; % initiate stim 2 presentation
                 vr.stim2_second = 1; % tag that stim 2 was presented second
-                disp(strcat('Second Stimulus: Stim2 started at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+                disp(strcat('Second Stimulus: Stim2 started at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
             case {2,3}
                 % Stim 1 is presented second
                 vr.Stim1_valve = 1; % initiate stim 1 presentation
                 vr.stim1_second = 1; % tag that stim 1 was presented second
-                disp(strcat('Second Stimulus: Stim1 started at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+                disp(strcat('Second Stimulus: Stim1 started at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         end
         vr.delay_started = 0; % delay has passed, set to 0
         vr.second_stim_begin = 1; % variable to verify if stim 2 has begun
@@ -607,14 +632,68 @@ function vr = runtimeCodeFun(vr)
     % START OF DECISION PERIOD
     % ************************
 
-    % Initiation of the decision point. (handle actuators and water delivery for probe trials)
+    % Initiation of the decision point.
     if (round(vr.stopwatch,1) == vr.decision_period_delay) && (vr.second_stim_begin == 1)
         % Display that the decision period has started
-        disp(strcat('Decision Point Started at t = ',num2str(round(vr.timeElapsed,1))));
+        disp(strcat('Decision Point Started at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         % Extend the actuator if it is active
         if vr.actuator_active == true
             vr.Extend_actuator = 1;
         end
+        % Update the variables to track the decision period
+        vr.second_stim_begin = 0; % stim 2 was presented and decision period has begun, set to 0
+        vr.decision_started = 1; % variable to verify if decision period has begun
+        vr.timepoint_to_track = vr.timeElapsed; % reset the timepoint to track the start of the decision period
+        vr.t_decision_start = vr.timepoint_to_track; % store the time of the start of the decision period
+    end
+    vr.stopwatch = vr.timeElapsed - vr.timepoint_to_track; % track the time of the delay
+
+    % **********************
+    % DURING DECISION PERIOD
+    % **********************
+
+    % if the decision period has started and the animal has not made a decision yet
+    if (vr.decision_started == 1) && (round(vr.stopwatch,1) < vr.decision_period)
+        if vr.integrate_licks == true
+            if vr.lick_signal(1) > 3 % if the lick signal is above 3V the tongue is in the left lickport
+                vr.licks_left = vr.licks_left + 1;
+            end
+            if vr.lick_signal(2) > 3 % if the lick signal is above 3V the tongue is in the right lickport
+                vr.licks_right = vr.licks_right + 1;
+            end
+        else
+            if vr.lick_signal(1) > 3 && vr.last_lick_signal(1) < 3 % lick onset on left lickport
+                vr.licks_left = vr.licks_left + 1;
+            end
+            if vr.lick_signal(2) > 3 && vr.last_lick_signal(2) < 3 % lick onset on right lickport
+                vr.licks_right = vr.licks_right + 1;
+            end
+        end
+        vr.last_lick_signal = vr.lick_signal; % update the last lick signal
+    end
+
+    % **********************
+    % START OF REINFORCEMENT
+    % **********************
+    
+    % End of the decision point. Check for the presence of the punishment and
+    % act acordingly depending on the combination of stims being present within
+    % the experiment
+    if (round(vr.stopwatch,1) == vr.decision_period) && (vr.decision_started == 1)
+        % Display that the decision period has ended
+        disp(strcat('Decision Point Ended at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
+        if vr.lickportBias == 0.5
+            disp(strcat('Licks on Left lickport: ',[' ' num2str(vr.licks_left)]));
+            disp(strcat('Licks on Right lickport: ',[' ' num2str(vr.licks_right)]));
+            vr.total_licks = vr.licks_left + vr.licks_right;
+        elseif vr.lickportBias == 0
+            disp(strcat('Licks on Left lickport: ',[' ' num2str(vr.licks_left)]));
+            vr.total_licks = vr.licks_left;
+        elseif vr.lickportBias == 1
+            disp(strcat('Licks on Right lickport: ',[' ' num2str(vr.licks_right)]));
+            vr.total_licks = vr.licks_right;
+        end
+
         % Deliver water if it is a probe trial
         if vr.probetrials(vr.current_trial) == 1
             disp('Probe trial');
@@ -661,230 +740,231 @@ function vr = runtimeCodeFun(vr)
                     else
                         vr.Deliver_water_left = 0;
                         vr.Deliver_water_right = 0;
-                        disp('No water delivere (match probe trial)');
+                        disp('No water delivered (match probe trial)');
                     end
-            end
-            % end the trial early
-            vr.end_trial_early = 1;
-        end
-        % Update the variables to track the decision period
-        vr.second_stim_begin = 0; % stim 2 was presented and decision period has begun, set to 0
-        vr.decision_started = 1; % variable to verify if decision period has begun
-        vr.timepoint_to_track = vr.timeElapsed; % reset the timepoint to track the start of the decision period
-        vr.t_decision_start = vr.timepoint_to_track; % store the time of the start of the decision period
-        % vr.timepoint_to_track = vr.timeElapsed+1; %1s delay once extended to make decision  ??????
-    end
-    vr.stopwatch = vr.timeElapsed - vr.timepoint_to_track; % track the time of the delay
-
-    % **********************
-    % DURING DECISION PERIOD
-    % **********************
-
-    % if the decision period has started and the animal has not made a decision yet
-    if (vr.decision_started == 1) && (round(vr.stopwatch,1) < vr.decision_period)
-        if vr.integrate_licks == true
-            if vr.lick_signal(1) > 3 % if the lick signal is above 3V the tongue is in the left lickport
-                vr.licks_left = vr.licks_left + 1;
-            end
-            if vr.lick_signal(2) > 3 % if the lick signal is above 3V the tongue is in the right lickport
-                vr.licks_right = vr.licks_right + 1;
             end
         else
-            if vr.lick_signal(1) > 3 && vr.last_lick_signal(1) < 3 % lick onset on left lickport
-                vr.licks_left = vr.licks_left + 1;
-            end
-            if vr.lick_signal(2) > 3 && vr.last_lick_signal(2) < 3 % lick onset on right lickport
-                vr.licks_right = vr.licks_right + 1;
-            end
-        end
-        vr.last_lick_signal = vr.lick_signal; % update the last lick signal
-    end
-
-    % **********************
-    % START OF REINFORCEMENT
-    % **********************
-    
-    % End of the decision point. Check for the presence of the punishment and
-    % act acordingly depending on the combination of stims being present within
-    % the experiment
-    if (round(vr.stopwatch,1) == vr.decision_period) && (vr.decision_started == 1)
-        % Display that the decision period has ended
-        disp(strcat('Decision Point Ended at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
-        if vr.lickportBias == 0.5
-            disp(strcat('Licks Left: ',num2str(vr.licks_left)));
-            disp(strcat('Licks Right: ',num2str(vr.licks_right)));
-            vr.total_licks = vr.licks_left + vr.licks_right;
-        elseif vr.lickportBias == 0
-            disp(strcat('Licks Left: ',num2str(vr.licks_left)));
-            vr.total_licks = vr.licks_left;
-        elseif vr.lickportBias == 1
-            disp(strcat('Licks Right: ',num2str(vr.licks_right)));
-            vr.total_licks = vr.licks_right;
-        end
-        % Check if the animal made a decision and act accordingly
-        switch vr.conditions(vr.current_trial)
-            case {1,2} % Non-matched trials
-                % Check if non-matched trial are rewarded
-                if strcmp(vr.rewarded_task,'non-match')
-                    % this is a go (rewarded) trial
-                    vr.go_licks = vr.go_licks + vr.total_licks;
-                    % check if lick is required
-                    if vr.lick_requirement == true
-                        % deliver water if the animal licked
-                        if vr.total_licks > 0
+            % Check if the animal made a decision and act accordingly
+            switch vr.conditions(vr.current_trial)
+                case {1,2} % Non-matched trials
+                    % Check if non-matched trial are rewarded
+                    if strcmp(vr.rewarded_task,'non-match')
+                        % this is a go (rewarded) trial
+                        vr.go_licks = vr.go_licks + vr.total_licks;
+                        % check if lick is required
+                        if vr.lick_requirement == true
+                            % deliver water if the animal licked
+                            if vr.total_licks > 0
+                                if vr.lickportBias == 0.5
+                                    vr.Deliver_water_right = 1;
+                                    vr.Deliver_water_left = 1;
+                                    disp('Delivering water to both lickports (non-match lick requirement met)');
+                                elseif vr.lickportBias == 0
+                                    vr.Deliver_water_left = 1;
+                                    disp('Delivering water to left lickport (non-match lick requirement met)');
+                                elseif vr.lickportBias == 1
+                                    vr.Deliver_water_right = 1;
+                                    disp('Delivering water to right lickport (non-match lick requirement met)');
+                                end
+                                vr.correct = 1;
+                                vr.reward_delivered = 1;
+                            else
+                                vr.wrong = 1;
+                                if vr.end_early_if_not_rewarded == true
+                                    disp('No water delivered, ending trial early (non-match lick requirement NOT met)');
+                                    % end the trial if the animal did not lick
+                                    vr.end_trial_early = 1;
+                                else
+                                    disp('No water delivered (non-match lick requirement NOT met)');
+                                end
+                            end
+                        else
+                            % deliver water regardless of licking
                             if vr.lickportBias == 0.5
                                 vr.Deliver_water_right = 1;
                                 vr.Deliver_water_left = 1;
-                                disp('Delivering water to both lickports (non-match lick requirement met)');
+                                disp('Delivering water to both lickports (non-match no lick requirement)');
                             elseif vr.lickportBias == 0
                                 vr.Deliver_water_left = 1;
-                                disp('Delivering water to left lickport (non-match lick requirement met)');
+                                disp('Delivering water to left lickport (non-match no lick requirement)');
                             elseif vr.lickportBias == 1
                                 vr.Deliver_water_right = 1;
-                                disp('Delivering water to right lickport (non-match lick requirement met)');
+                                disp('Delivering water to right lickport (non-match no lick requirement)');
                             end
-                            vr.correct = 1;
                             vr.reward_delivered = 1;
-                        else
-                            vr.wrong = 1;
-                            disp('No water delivered, ending trial early (non-match lick requirement NOT met)');
-                            % end the trial if the animal did not lick
-                            vr.end_trial_early = 1;
-
+                            % check if the animal licked
+                            if vr.total_licks > 0
+                                vr.correct = 1;
+                            else
+                                vr.wrong = 1;
+                            end
                         end
                     else
-                        % deliver water regardless of licking
-                        if vr.lickportBias == 0.5
-                            vr.Deliver_water_right = 1;
-                            vr.Deliver_water_left = 1;
-                            disp('Delivering water to both lickports (non-match no lick requirement)');
-                        elseif vr.lickportBias == 0
-                            vr.Deliver_water_left = 1;
-                            disp('Delivering water to left lickport (non-match no lick requirement)');
-                        elseif vr.lickportBias == 1
-                            vr.Deliver_water_right = 1;
-                            disp('Delivering water to right lickport (non-match no lick requirement)');
-                        end
-                        vr.reward_delivered = 1;
-                        % check if the animal licked
-                        if vr.total_licks > 0
-                            vr.correct = 1;
+                        % this is a nogo (unrewarded) trial
+                        vr.nogo_licks = vr.nogo_licks + vr.total_licks;
+                        % check if puff punishment is active
+                        if vr.puff_punishment == true || vr.timeout_punishment == true
+                            % deliver puff of air if the animal licked
+                            if vr.total_licks > 0
+                                vr.wrong = 1;
+                                % resolve puff punishment
+                                if vr.puff_punishment == true
+                                    vr.puffPun = 1;
+                                    vr.puff_delivered = 1;
+                                    if vr.end_early_if_not_rewarded == true
+                                        disp('Puff punishment delivered, ending trial early (non-matched trial lick observed)');
+                                        % end the trial if the animal licked
+                                        vr.end_trial_early = 1;
+                                    else
+                                        disp('Puff punishment delivered (non-matched trial lick observed)');
+                                    end
+                                end
+                                % resolve timeout punishment
+                                if vr.timeout_punishment == true
+                                    vr.timeoutPun = 1;
+                                    vr.timeout_delivered = 1;
+                                    if vr.end_early_if_not_rewarded == true
+                                        disp('Timeout punishment delivered, ending trial early (non-matched trial lick observed)');
+                                        % end the trial if the animal licked
+                                        vr.end_trial_early = 1;
+                                    else
+                                        disp('Timeout punishment delivered (non-matched trial lick observed)');
+                                    end
+                                end
+                            else
+                                disp('No punishment delivered (non-matched trial no lick observed)');
+                                vr.correct = 1;
+                            end
                         else
-                            vr.wrong = 1;
+                            % deliver no punishment regardless of licking
+                            if vr.end_early_if_not_rewarded == true
+                                disp('No punishment delivered, ending trial early (non-matched trial no punishment)');
+                                % end the trial if the animal licked
+                                vr.end_trial_early = 1;
+                            else
+                                disp('No punishment delivered (non-matched trial no punishment)');
+                            end
+                            % check if the animal licked
+                            if vr.total_licks > 0
+                                vr.wrong = 1;
+                            else
+                                vr.correct = 1;
+                            end
                         end
                     end
-                else
-                    % this is a nogo (unrewarded) trial
-                    vr.nogo_licks = vr.nogo_licks + vr.total_licks;
-                    % check if puff punishment is active
-                    if vr.puff_punishment == true
-                        % deliver puff of air if the animal licked
-                        if vr.total_licks > 0
-                            vr.puffPun = 1;
-                            disp('Puff punishment delivered, ending trial early (non-matched trial lick observed)');
-                            vr.wrong = 1;
-                            vr.punishment_delivered = 1;
-                            % end the trial if the animal licked
-                            vr.end_trial_early = 1;
+                case {3,4} % Matched trials
+                    % Check if matched trial are rewarded
+                    if strcmp(vr.rewarded_task,'match')
+                        % this is a go (rewarded) trial
+                        vr.go_licks = vr.go_licks + vr.total_licks;
+                        % check if lick is required
+                        if vr.lick_requirement == true
+                            % deliver water if the animal licked
+                            if vr.total_licks > 0
+                                if vr.lickportBias == 0.5
+                                    vr.Deliver_water_right = 1;
+                                    vr.Deliver_water_left = 1;
+                                    disp('Delivering water to both lickports (match lick requirement met)');
+                                elseif vr.lickportBias == 0
+                                    vr.Deliver_water_left = 1;
+                                    disp('Delivering water to left lickport (match lick requirement met)');
+                                elseif vr.lickportBias == 1
+                                    vr.Deliver_water_right = 1;
+                                    disp('Delivering water to right lickport (match lick requirement met)');
+                                end
+                                vr.correct = 1;
+                                vr.reward_delivered = 1;
+                            else
+                                vr.wrong = 1;
+                                if vr.end_early_if_not_rewarded == true
+                                    disp('No water delivered, ending trial early (match lick requirement NOT met)');
+                                    % end the trial if the animal did not lick
+                                    vr.end_trial_early = 1;
+                                else
+                                    disp('No water delivered (match lick requirement NOT met)');
+                                end
+                            end
                         else
-                            disp('No puff punishment delivered (non-matched trial no lick observed)');
-                            vr.correct = 1;
-                        end
-                    else
-                        % deliver no air puff regardless of licking
-                        disp('No puff punishment delivered (non-matched trial no puff punishment)');
-                        % check if the animal licked
-                        if vr.total_licks > 0
-                            vr.wrong = 1;
-                        else
-                            vr.correct = 1;
-                        end
-                    end
-                end
-            case {3,4} % Matched trials
-                % Check if matched trial are rewarded
-                if strcmp(vr.rewarded_task,'match')
-                    % this is a go (rewarded) trial
-                    vr.go_licks = vr.go_licks + vr.total_licks;
-                    % check if lick is required
-                    if vr.lick_requirement == true
-                        % deliver water if the animal licked
-                        if vr.total_licks > 0
+                            % deliver water regardless of licking
                             if vr.lickportBias == 0.5
                                 vr.Deliver_water_right = 1;
                                 vr.Deliver_water_left = 1;
-                                disp('Delivering water to both lickports (match lick requirement met)');
+                                disp('Delivering water to both lickports (match no lick requirement)');
                             elseif vr.lickportBias == 0
                                 vr.Deliver_water_left = 1;
-                                disp('Delivering water to left lickport (match lick requirement met)');
+                                disp('Delivering water to left lickport (match no lick requirement)');
                             elseif vr.lickportBias == 1
                                 vr.Deliver_water_right = 1;
-                                disp('Delivering water to right lickport (match lick requirement met)');
+                                disp('Delivering water to right lickport (match no lick requirement)');
                             end
-                            vr.correct = 1;
                             vr.reward_delivered = 1;
-                        else
-                            vr.wrong = 1;
-                            disp('No water delivered, ending trial early (match lick requirement NOT met)');
-                            % end the trial if the animal did not lick
-                            vr.end_trial_early = 1;
+                            % check if the animal licked
+                            if vr.total_licks > 0
+                                vr.correct = 1;
+                            else
+                                vr.wrong = 1;
+                            end
                         end
                     else
-                        % deliver water regardless of licking
-                        if vr.lickportBias == 0.5
-                            vr.Deliver_water_right = 1;
-                            vr.Deliver_water_left = 1;
-                            disp('Delivering water to both lickports (match no lick requirement)');
-                        elseif vr.lickportBias == 0
-                            vr.Deliver_water_left = 1;
-                            disp('Delivering water to left lickport (match no lick requirement)');
-                        elseif vr.lickportBias == 1
-                            vr.Deliver_water_right = 1;
-                            disp('Delivering water to right lickport (match no lick requirement)');
-                        end
-                        vr.reward_delivered = 1;
-                        % check if the animal licked
-                        if vr.total_licks > 0
-                            vr.correct = 1;
+                        % this is a nogo (unrewarded) trial
+                        vr.nogo_licks = vr.nogo_licks + vr.total_licks;
+                        % check if puff punishment is active
+                        if vr.puff_punishment == true || vr.timeout_punishment == true
+                            % deliver puff of air if the animal licked
+                            if vr.total_licks > 0
+                                vr.wrong = 1;
+                                % resolve puff punishment
+                                if vr.puff_punishment == true
+                                    vr.puffPun = 1;
+                                    vr.puff_delivered = 1;
+                                    if vr.end_early_if_not_rewarded == true
+                                        disp('Puff punishment delivered, ending trial early (matched trial lick observed)');
+                                        % end the trial if the animal licked
+                                        vr.end_trial_early = 1;
+                                    else
+                                        disp('Puff punishment delivered (matched trial lick observed)');
+                                    end
+                                end
+                                % resolve timeout punishment
+                                if vr.timeout_punishment == true
+                                    vr.timeoutPun = 1;
+                                    vr.timeout_delivered = 1;
+                                    if vr.end_early_if_not_rewarded == true
+                                        disp('Timeout punishment delivered, ending trial early (matched trial lick observed)');
+                                        % end the trial if the animal licked
+                                        vr.end_trial_early = 1;
+                                    else
+                                        disp('Timeout punishment delivered (matched trial lick observed)');
+                                    end
+                                end
+                            else
+                                disp('No punishment delivered (matched trial no lick observed)');
+                                vr.correct = 1;
+                            end
                         else
-                            vr.wrong = 1;
+                            % deliver no air puff regardless of licking
+                            if vr.end_early_if_not_rewarded == true
+                                disp('No punishment delivered, ending trial early (matched trial no punishment)');
+                                % end the trial if the animal licked
+                                vr.end_trial_early = 1;
+                            else
+                                disp('No punishment delivered (matched trial no punishment)');
+                            end
+                            % check if the animal licked
+                            if vr.total_licks > 0
+                                vr.wrong = 1;
+                            else
+                                vr.correct = 1;
+                            end
                         end
                     end
-                else
-                    % this is a nogo (unrewarded) trial
-                    vr.nogo_licks = vr.nogo_licks + vr.total_licks;
-                    % check if puff punishment is active
-                    if vr.puff_punishment == true
-                        % deliver puff of air if the animal licked
-                        if vr.total_licks > 0
-                            vr.puffPun = 1;
-                            disp('Puff punishment delivered, ending trial early (matched trial lick observed)');
-                            vr.wrong = 1;
-                            vr.punishment_delivered = 1;
-                            % end the trial if the animal licked
-                            vr.end_trial_early = 1;
-                        else
-                            disp('No puff punishment delivered (matched trial no lick observed)');
-                            vr.correct = 1;
-                        end
-                    else
-                        % deliver no air puff regardless of licking
-                        disp('No puff punishment delivered (matched trial no puff punishment)');
-                        % check if the animal licked
-                        if vr.total_licks > 0
-                            vr.wrong = 1;
-                        else
-                            vr.correct = 1;
-                        end
-                    end
-                end
+            end
         end
         vr.decision_started = 0; % decision period has ended, set to 0
-        vr.reward_started = 1; % variable to verify if decision period has ended
+        vr.reinforcement_started = 1; % variable to verify if decision period has ended
         %  track the timepoint to track the start of the reinforcement period
         vr.timepoint_to_track = vr.timeElapsed; % reset the timepoint to track the start of the reinforcement period
         vr.t_reinforcement_start = vr.timepoint_to_track; % store the time of the start of the reinforcement period
-        
     end
     vr.stopwatch = vr.timeElapsed - vr.timepoint_to_track; % track the time from the end of the decision period
     
@@ -892,12 +972,19 @@ function vr = runtimeCodeFun(vr)
     % END OF REINFORCEMENT and START OF ITI
     % *************************************
 
-    % If the trial has ended early end the trial and start the ITI OR if the
-    % trial has not ended early and the reward period has passed end the trial
-    % and start the ITI
-    if vr.end_trial_early == 1 || (vr.reward_started == 1 && round(vr.stopwatch,1) == vr.reward_period)
-        % Display that the reward period has ended
-        disp(strcat('Reward Period Ended at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+    % Reinforcement can be 1) water, 2) empty time after puff punishment or 3) timeout punishment
+
+    % There are 4 cases to consider:
+    % 1) End trial early is true and there is no timeout punishment
+    % 2) End trial early is true and there is timeout punishment so stopwatch must reach the end of the timeout period
+    % 3) End trial early is false and there is no timeout punishment, so stopwatch must reach the end of the reward period
+    % 4) End trial early is false and there is timeout punishment, so stopwatch must reach the end of the reward period + timeout period
+    if (vr.reinforcement_started == 1 && vr.end_trial_early == 1 && vr.timeout_delivered == 0) || ... 
+       (vr.reinforcement_started == 1 && vr.end_trial_early == 1 && vr.timeout_delivered == 1 && round(vr.stopwatch,1) == vr.timeout_period) || ...
+       (vr.reinforcement_started == 1 && vr.end_trial_early == 0 && vr.timeout_delivered == 0 && round(vr.stopwatch,1) == vr.reward_period) || ...
+       (vr.reinforcement_started == 1 && vr.end_trial_early == 0 && vr.timeout_delivered == 1 && round(vr.stopwatch,1) == vr.reward_period + vr.timeout_period)
+        % Display that the reinforcement period has ended
+        disp(strcat('Reinforcement Period Ended at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         % Retract the actuator if it is active
         if vr.actuator_active == true
             vr.Retract_actuator = 1;
@@ -909,8 +996,8 @@ function vr = runtimeCodeFun(vr)
         % turn AirON on for puff punishment
         vr.AirON = 1;
         % Start the ITI
-        disp(strcat('ITI started at t = ',num2str(round(vr.ITI,1)), ' s'));
-        vr.reward_started = 0; % reward period has ended, set to 0
+        disp(strcat('ITI started for ',[' ' num2str(round(vr.ITI,1))], ' s'));
+        vr.reinforcement_started = 0; % reward period has ended, set to 0
         vr.end_trial_early = 0; % trial has ended, set to 0
         vr.ITI_started = 1; % variable to verify if ITI has started
         vr.timepoint_to_track = vr.timeElapsed; % reset the timepoint to track the start of the ITI
@@ -920,7 +1007,7 @@ function vr = runtimeCodeFun(vr)
 
     % After 15 seconds ITI ends
     if ((round(vr.stopwatch,1) == vr.ITI) && (vr.ITI_started == 1))
-        disp(strcat('ITI ended at t = ',num2str(round(vr.timeElapsed,1)), ' s'));
+        disp(strcat('ITI ended at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         disp('------------------------------');
         % turn puff punishment off
         vr.puffPun = 0;
@@ -947,8 +1034,9 @@ function vr = runtimeCodeFun(vr)
         % 18 - correct
         % 19 - wrong
         % 20 - reward delivered
-        % 21 - punishment delivered
-        % 22 - probe trial
+        % 21 - puff delivered
+        % 22 - timeout delivered
+        % 23 - probe trial
 
 
         vr.TrialData(vr.current_trial,1)=vr.current_trial;
@@ -971,15 +1059,17 @@ function vr = runtimeCodeFun(vr)
         vr.TrialData(vr.current_trial,18)=vr.correct;
         vr.TrialData(vr.current_trial,19)=vr.wrong;
         vr.TrialData(vr.current_trial,20)=vr.reward_delivered;
-        vr.TrialData(vr.current_trial,21)=vr.punishment_delivered;
-        vr.TrialData(vr.current_trial,22)=vr.probetrials(vr.current_trial);
+        vr.TrialData(vr.current_trial,21)=vr.puff_delivered;
+        vr.TrialData(vr.current_trial,22)=vr.timeout_delivered;
+        vr.TrialData(vr.current_trial,23)=vr.probetrials(vr.current_trial);
 
         % reset all the variables to their initial values
         vr.licks_left = 0;
         vr.licks_right = 0;
         vr.total_licks = 0;
         vr.reward_delivered = 0;
-        vr.punishment_delivered = 0;
+        vr.puff_delivered = 0;
+        vr.timeout_delivered = 0;
         vr.correct = 0;
         vr.wrong = 0;
         vr.stim1_first = 0;
@@ -1000,7 +1090,7 @@ function vr = runtimeCodeFun(vr)
         vr.delay_started = 0;
         vr.second_stim_begin = 0;
         vr.decision_started = 0;
-        vr.reward_started = 0;
+        vr.reinforcement_started = 0;
         vr.end_trial_early = 0;
         vr.ITI_started = 0;
 
@@ -1048,8 +1138,9 @@ function vr = runtimeCodeFun(vr)
     % 8 - Retract actuator
     % 9 - Synch pulse
     % 10 - Puff punishment
+    % 11 - Timeout punishment (not implemented yet)
 
-    outputSingleScan(vr.DigitalSess,[vr.AirON vr.tone vr.Stim1_valve vr.Stim2_valve vr.Deliver_water_left vr.Deliver_water_right vr.Extend_actuator vr.Retract_actuator vr.synchPulse vr.puffPun]);
+    outputSingleScan(vr.DigitalSess,[vr.AirON vr.tone vr.Stim1_valve vr.Stim2_valve vr.Deliver_water_left vr.Deliver_water_right vr.Extend_actuator vr.Retract_actuator vr.synchPulse vr.puffPun]); % vr.timeoutPun]);
 
     % Save all the relevant interation variables to the matrix IterationData
     % ITERATION MATRIX:
@@ -1065,10 +1156,11 @@ function vr = runtimeCodeFun(vr)
     % 10 - Retract actuator
     % 11 - Synch pulse
     % 12 - Puff punishment
-    % 13 - Left Lickport Signal
-    % 14 - Right Lickport Signal
-    % 15 - Go Licks
-    % 16 - NoGo Licks
+    % 13 - Timeout punishment
+    % 14 - Left Lickport Signal
+    % 15 - Right Lickport Signal
+    % 16 - Go Licks
+    % 17 - NoGo Licks
 
     vr.IterationData(vr.iterations,1)=vr.timeElapsed;
     vr.IterationData(vr.iterations,2)=vr.current_trial;
@@ -1082,10 +1174,11 @@ function vr = runtimeCodeFun(vr)
     vr.IterationData(vr.iterations,10)=vr.Retract_actuator;
     vr.IterationData(vr.iterations,11)=vr.synchPulse;
     vr.IterationData(vr.iterations,12)=vr.puffPun;
-    vr.IterationData(vr.iterations,13)=vr.lick_signal(1);
-    vr.IterationData(vr.iterations,14)=vr.lick_signal(2);
-    vr.IterationData(vr.iterations,15)=vr.go_licks;
-    vr.IterationData(vr.iterations,16)=vr.nogo_licks;
+    vr.IterationData(vr.iterations,13)=vr.timeoutPun;
+    vr.IterationData(vr.iterations,14)=vr.lick_signal(1);
+    vr.IterationData(vr.iterations,15)=vr.lick_signal(2);
+    vr.IterationData(vr.iterations,16)=vr.go_licks;
+    vr.IterationData(vr.iterations,17)=vr.nogo_licks;
 
 
 % --- TERMINATION code: executes after the ViRMEn engine stops.
@@ -1120,14 +1213,6 @@ function vr = terminationCodeFun(vr)
     % Save the iteration and trial matrices as csv files after adding headers
     IterationData = vr.IterationData;
     TrialData = vr.TrialData;
-
-    % Add headers to the iteration matrix
-    IterationData = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;IterationData];
-    IterationData(1,:) = {'Time Elapsed','Current Trial','Air ON','Tone','Stim 1 Valve','Stim 2 Valve','Deliver Water Left','Deliver Water Right','Extend Actuator','Retract Actuator','Synch Pulse','Puff Punishment','Left Lickport Signal','Right Lickport Signal','Go Licks','NoGo Licks'};
-
-    % Add headers to the trial matrix
-    TrialData = [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;TrialData];
-    TrialData(1,:) = {'Trial Number','Condition','Delay','Stim 1 First','Stim 2 First','Stim 1 Second','Stim 2 Second','Time of the Start Tone','Time of the Start of Stim 1','Time of the Start of the Delay','Time of the Start of Stim 2','Time of the Start of the Decision Period','Time of the Start of the Reinforcement Period','Time of the Start of the ITI','Licks Left','Licks Right','Total Licks','Correct','Wrong','Reward Delivered','Punishment Delivered','Probe Trial'};
 
     % Save the iteration and trial matrices as csv files
     csvwrite([vr.outputPath vr.outputFile '_IterationData' vr.name_addendum vr.addl_name_addendum '.csv'],IterationData);
