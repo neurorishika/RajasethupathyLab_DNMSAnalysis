@@ -34,7 +34,7 @@ function vr = initializationCodeFun(vr)
     % =====================
 
     % REMEMBER TO CHECK THESE PARAMETERS FOR EACH EXPERIMENT
-    vr.rewarded_task = 'match';  % Whether 'match' or 'non-match' trials are rewarded
+    vr.rewarded_task = 'non-match';  % Whether 'match' or 'non-match' trials are rewarded
     vr.additional_str = '';  % Additional notes to be added to the file name (optional)
     
     % PRESET OPTIONS: 
@@ -42,8 +42,10 @@ function vr = initializationCodeFun(vr)
     % - '' : default parameters
     % - 'water_release' : water released on left lickport to prime the rig for water delivery
     % - 'interleaved_refresher' : interleaved trials with only the rewarded stimulus (no lick requirement or punishment)
-    % - 'short_blocked_habituation' : blocked trials (no lick requirement or punishment); 20 trials
-    % - 'long_blocked_habituation' : blocked trials (no lick requirement or punishment); 40 trials
+    % - 'short_blocked_habituation' : blocked trials only rewarding (no lick requirement or punishment); 20 trials
+    % - 'long_blocked_habituation' : blocked trials only rewarding (no lick requirement or punishment); 40 trials
+    % - 'short_blocked_stimulus_training' : blocked trials (no lick requirement or punishment); 20 trials
+    % - 'long_blocked_stimulus_training' : blocked trials (no lick requirement or punishment); 40 trials
     % - 'short_blocked_lick_training' : blocked trials (lick requirement, no punishment); 20 trials
     % - 'long_blocked_lick_training' : blocked trials  (lick requirement, no punishment); 40 trials
     % - 'short_blocked_contrast_training' : blocked trials (lick requirement, air puff as punishment); 20 trials
@@ -51,7 +53,7 @@ function vr = initializationCodeFun(vr)
     % - 'short_test' : interleaved trials (lick requirement, no punishment); 20 trials
     % - 'long_test' : interleaved trials (lick requirement, no punishment); 40 trials
 
-    vr.use_preset = ''; % Enter the name of the preset to use (leave empty for default)
+    vr.use_preset = 'short_blocked_habituation'; % Enter the name of the preset to use (leave empty for default)
 
     % DETAILED DESCRIPTION OF THE EXPERIMENT PARAMETERS
     % -------------------------------------------------
@@ -168,6 +170,11 @@ function vr = initializationCodeFun(vr)
         vr.blocked_vs_interleaved = 'blocked';
         vr.ntrials = 20;
         vr.blockSize = 5;
+        if strcmp(vr.rewarded_task,'match')
+            vr.matched_bias = 1;
+        elseif strcmp(vr.rewarded_task,'non-match')
+            vr.matched_bias = 0;
+        end
     end
 
     % long blocked habituation
@@ -176,8 +183,29 @@ function vr = initializationCodeFun(vr)
         vr.blocked_vs_interleaved = 'blocked';
         vr.ntrials = 40;
         vr.blockSize = 5;
+        if strcmp(vr.rewarded_task,'match')
+            vr.matched_bias = 1;
+        elseif strcmp(vr.rewarded_task,'non-match')
+            vr.matched_bias = 0;
+        end
+    end
+    
+    % short blocked stimulus training
+    if strcmp(vr.use_preset,'short_blocked_stimulus_training')
+        vr.experimentName = 'stim_training';
+        vr.blocked_vs_interleaved = 'blocked';
+        vr.ntrials = 20;
+        vr.blockSize = 5;
     end
 
+    % long blocked stimulus training
+    if strcmp(vr.use_preset,'long_blocked_stimulus_training')
+        vr.experimentName = 'stim_training';
+        vr.blocked_vs_interleaved = 'blocked';
+        vr.ntrials = 40;
+        vr.blockSize = 5;
+    end
+    
     % short blocked lick training
     if strcmp(vr.use_preset,'short_blocked_lick_training')
         vr.experimentName = 'lick_training';
@@ -288,20 +316,26 @@ function vr = initializationCodeFun(vr)
     % save the experiment metadata as a separate file (using a structure)
     experiment_metadata.outputFile = vr.outputFile;
     experiment_metadata.outputPath = vr.outputPath;
+    experiment_metadata.rewarded_task = vr.rewarded_task;
+    experiment_metadata.debugMode = vr.debugMode;
+    experiment_metadata.use_preset = vr.use_preset;
     experiment_metadata.name = vr.name;
     experiment_metadata.cagenum = vr.cagenum;
     experiment_metadata.experimentName = vr.experimentName;
     experiment_metadata.lick_requirement = vr.lick_requirement;
     experiment_metadata.puff_punishment = vr.puff_punishment;
+    experiment_metadata.actuator_active = vr.actuator_active;
     experiment_metadata.blocked_vs_interleaved = vr.blocked_vs_interleaved;
     experiment_metadata.ntrials = vr.ntrials;
     experiment_metadata.blockSize = vr.blockSize;
     experiment_metadata.matched_bias = vr.matched_bias;
     experiment_metadata.stim_bias = vr.stim_bias;
     experiment_metadata.lickportBias = vr.lickportBias;
+    experiment_metadata.end_early_if_not_rewarded = vr.end_early_if_not_rewarded;
     experiment_metadata.startTone_to_stim1_delay = vr.startTone_to_stim1_delay;
     experiment_metadata.stim1_to_stim2_delay_mean = vr.stim1_to_stim2_delay_mean;
     experiment_metadata.stim1_to_stim2_delay_std = vr.stim1_to_stim2_delay_std;
+    experiment_metadata.stim_wait = vr.stim_wait;
     experiment_metadata.decision_period_delay = vr.decision_period_delay;
     experiment_metadata.decision_period = vr.decision_period;
     experiment_metadata.reward_period = vr.reward_period;
@@ -960,6 +994,10 @@ function vr = runtimeCodeFun(vr)
                     end
             end
         end
+        if vr.puffPun == 1
+            % start the air for the puff punishment
+            vr.AirON = 1;
+        end
         vr.decision_started = 0; % decision period has ended, set to 0
         vr.reinforcement_started = 1; % variable to verify if decision period has ended
         %  track the timepoint to track the start of the reinforcement period
@@ -993,8 +1031,7 @@ function vr = runtimeCodeFun(vr)
         vr.Deliver_water_left = 0;
         vr.Deliver_water_right = 0;
         vr.last_lick_signal = [0 0];
-        % turn AirON on for puff punishment
-        vr.AirON = 1;
+        vr.puffPun = 0;
         % Start the ITI
         disp(strcat('ITI started for ',[' ' num2str(round(vr.ITI,1))], ' s'));
         vr.reinforcement_started = 0; % reward period has ended, set to 0
@@ -1009,8 +1046,6 @@ function vr = runtimeCodeFun(vr)
     if ((round(vr.stopwatch,1) == vr.ITI) && (vr.ITI_started == 1))
         disp(strcat('ITI ended at t =',[' ' num2str(round(vr.timeElapsed,1))], ' s'));
         disp('------------------------------');
-        % turn puff punishment off
-        vr.puffPun = 0;
 
         % ADD ALL TRIAL VARIABLES TO THE TRIAL MATRIX
         % TRIAL MATRIX:
@@ -1217,6 +1252,9 @@ function vr = terminationCodeFun(vr)
     % Save the iteration and trial matrices as csv files
     csvwrite([vr.outputPath vr.outputFile '_IterationData' vr.name_addendum vr.addl_name_addendum '.csv'],IterationData);
     csvwrite([vr.outputPath vr.outputFile '_TrialData' vr.name_addendum vr.addl_name_addendum '.csv'],TrialData);
+    
+    % Run python script to generate the plots
+    system(['python "C:\Users\VR Rig #2\Documents\generate_plots.py" ' vr.outputPath ' ' vr.outputFile '_ ' vr.name_addendum vr.addl_name_addendum]);
     
     % Close everything
     close all;
