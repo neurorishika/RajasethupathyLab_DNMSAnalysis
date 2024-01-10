@@ -133,7 +133,7 @@ plt.ioff()
 
 # loop through trials and make lick rasters
 fig, ax = plt.subplots(1,1,figsize=(10,5*ntrials/20))
-for trial in range(1,ntrials+1):
+for trial in range(1,min(ntrials+1, len(trial_data)+1)):
     # find the lick onset times for this trial
     trial_mask = iteration_data['current_trial'] == trial
     
